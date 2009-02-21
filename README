@@ -6,18 +6,8 @@ is accessed by a particular user.  Thresholds can be applied to multiple partial
 even span controllers and actions.
 
 ==== Usage
-	* View Based Thresholding
-		* Captcha'ing
-		* Halting
-		* Waiting
+DOCUMENTATION COMING SATURDAY HOLY CRAP!
 
-
-  * Partial Based Thresholding
-
-
-	* Cross Controller / Action Thresholding
-		# permit_another? to determine if it should be prethresholded (test this)
-	
 
 ==== Notes
  * The objective behind naming thresholds is the ability to use them across controllers and actions
