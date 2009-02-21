@@ -1,0 +1,64 @@
+merb_threshold
+==============
+
+Merb Threshold provides an easy way to apply control the number of times an view or partial
+is accessed by a particular user.  Thresholds can be applied to multiple partials per page and can
+even span controllers and actions.
+
+==== Usage
+	* View Based Thresholding
+		* Captcha'ing
+		* Halting
+		* Waiting
+
+
+  * Partial Based Thresholding
+
+
+	* Cross Controller / Action Thresholding
+		# permit_another? to determine if it should be prethresholded (test this)
+	
+
+==== Notes
+ * The objective behind naming thresholds is the ability to use them across controllers and actions
+		This allows the ability to show a captcha on a sign up page, but register the access only when posted
+
+ * default_threshold_name vs threshold_key: the key is the key used to find the threshold statistics
+		in a users session.  It is not the same as the threshold_name when the :params options is used
+		
+		# routed to: /blog/index/35
+		threshold :blog_index, :params => [:blog_id]
+		default_threshold_name 	= "blog/index"
+		threshold_name 					= :index  # ( referring to the local variable 'threshold_name')
+		threshold_key						= "blog_index/35"
+		
+		# routed to: /user/create
+		threshold
+		default_threshold_name	= "user/create"
+		threshold_name					= nil
+		threshold_key						= "user/create"
+
+		
+ * Thresholds can be named whatever you want, so they can be programmatically created.  Also
+	the option :params => [:blog_id,:etc] is available that will use param values as part of the key
+		
+ * merb_threshold currently stores everything in the session (may have support for)
+		additional stores in the future.  On that note, it is not recommended to be used
+		with cookie base sessions because it could be easy for a user to go over 4k worth
+		of data if the site is composed of many controllers, actions, and partials
+
+ * Note that thresholds presents captcha, wait, halt when it is EXCEEDED.  So
+ 		Given:
+			threshold :limit => [3,30.seconds]
+		The captcha, wait, or halt would happen on the 4th occurrance.
+		
+ * the 'threshold' class method is just a wrapper for before filters
+		See MerbController#threshold for examples
+				
+ * Time.now is used for all times since access times are relative
+		The frequency class could be a lot more useful if it didn't explicitly use Time.now and you could
+		look forward and backward over time.  Fortunately that complexity isn't needed for actions because
+		you are accessing them 'now' and the plugin is concerned with 'when' they were last accessed.
+		
+ * If you dont like the way units are cast using :limit => [1,30.minutes]
+		You can override Frequency#cast_units OR specify :limt => [1,30,:minutes]

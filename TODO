@@ -1,0 +1,27 @@
+TODO:		
+	* Consider adding ability to have various captcha services (?)
+	* Consider adding ability to have various stores for threshold data
+	* Consider supporting for view level params as part of threshold_name
+		* should the value of the param or its key be part of the threshold_name
+	* Consider HTTP method option to threshold
+	* Support for MerbParts
+	
+Caching things in instance variables to get around doing hash lookups and loops multlilpletimes
+
+WEIRD Behavior when one method checks threshold and the other controlls
+maybe fix with making treshold_Exceeded? action test rather than read from session cache	
+
+
+
+WEIRD behavior, not picking up @captcha_error (thats because its redirecting and losing teh var)
+			
+			
+{"format"=>nil, "action"=>"login", "username"=>"cory", "id"=>nil, 
+	"controller"=>"test", 
+	"recaptcha_response_field"=>"case least", 
+	"password"=>"",
+	"recaptcha_challenge_field"=>
+		"02v5YKyME04Yq5_hjO5jrJbzfmprFTuX5huh-4vCbk5Ph0kgbT1e3GzO9yQaH3FdLe440vNLSHYI6_G_4D_8k8eFywsLxi4za41MYt9tdsxqs1yTvDoHDebsfn6lJXJYOKOwzSHVK71DVEbqDQfUZuzM0pbes3SzQFKK-Dx31aDUxQjAX-kCWJPFJY86mIzV2Ja20X4UBYKGlMDPkOYAu6BaroQ7DW-lV2feD8aJG_dJdfwFb3AZrL_EFJfnWv5a5tRy6agQDz0BTrg3Fa5c8iQu2vxkwB"}
+			
+			
+			
