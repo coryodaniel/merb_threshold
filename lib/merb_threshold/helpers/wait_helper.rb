@@ -14,9 +14,11 @@ module Merb
         opts = threshold_name
         threshold_name = nil
       end
+
       curr_thresh_key = threshold_key(threshold_name)
-      # if its currently exceeded display captcha
-      if currently_exceeded? curr_thresh_key
+
+      # if it wont permit another show wait
+      if permit_another? threshold_name
         _wait_partial = opts.delete(:partial) || Merb::Plugins.config[:merb_threshold][:wait_partial]
         _partial_opts = opts.delete(:partial_opts) || {}
         _partial_opts.merge!({

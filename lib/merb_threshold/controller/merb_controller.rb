@@ -13,7 +13,12 @@ module Merb
 
 
     ##
-    # Would the threshold permit another request
+    # Used for determining if a subsequent request would exceed the threshold
+    #   
+    # Good for protecting a post with a form or display captcha/wait before
+    #   the threshold is exceeded
+    #
+    # @note See READEME: permit_another? vs currently_exceeded?
     #
     # @param threshold_name [~Symbol] The threshold to look up
     #
@@ -23,16 +28,27 @@ module Merb
       
       opts = get_threshold_options(threshold_name)
       curr_threshold_key = threshold_key(threshold_name)
-      
-      frequency = Frequency.new *opts[:limit]
-      frequency.load! access_history(curr_threshold_key)
+
+      # if opts[:limit] is not set that means the threshold hasn't been registered yet
+      #   so permit access, the threshold will be registered once threshold() is called
+      #   which is usually behind the post request this would be submitted to.
+      if opts[:limit]
+        frequency = Frequency.new *opts[:limit]
+        frequency.load! access_history(curr_threshold_key)
     
-      frequency.permit?
+        frequency.permit?
+      else
+        true
+      end
     end
     
     ##
-    # Is the threshold currently exceeded
-    # 
+    # Is the threshold currenlty exceeded either by this request or a previous one
+    #
+    # Good for redirecting access during the current request
+    #
+    # @note See READEME: permit_another? vs currently_exceeded?
+    #
     # @param curr_threshold_key [~Symbol]
     #   current threshold key to lookup
     #

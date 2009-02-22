@@ -1,6 +1,5 @@
 if defined?(Merb::Plugins)  
   Merb::Plugins.config[:merb_threshold] = {
-  # TODO remove global catpcha keys
     :public_key           => nil,
     :private_key          => nil,
     :recaptcha            => true,

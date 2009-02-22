@@ -2,15 +2,15 @@
 
 Gem::Specification.new do |s|
   s.name = %q{merb_threshold}
-  s.version = "0.1.1"
+  s.version = "0.1.2"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Cory O'Daniel"]
-  s.date = %q{2009-02-16}
+  s.date = %q{2009-02-21}
   s.description = %q{Merb plugin that provides resource access rate limits and captcha'ing}
   s.email = %q{contact@coryodaniel.com}
   s.extra_rdoc_files = ["README", "LICENSE", "TODO"]
-  s.files = ["LICENSE", "README", "Rakefile", "TODO", "lib/merb_threshold", "lib/merb_threshold/clients", "lib/merb_threshold/clients/recaptcha.rb", "lib/merb_threshold/controller", "lib/merb_threshold/controller/merb_controller.rb", "lib/merb_threshold/core_ext", "lib/merb_threshold/core_ext/fixnum.rb", "lib/merb_threshold/frequency.rb", "lib/merb_threshold/merbtasks.rb", "lib/merb_threshold/stores", "lib/merb_threshold/stores/session.rb", "lib/merb_threshold.rb", "spec/merb_threshold_spec.rb", "spec/spec_helper.rb"]
+  s.files = ["LICENSE", "README", "Rakefile", "TODO", "lib/merb_threshold", "lib/merb_threshold/controller", "lib/merb_threshold/controller/merb_controller.rb", "lib/merb_threshold/frequency.rb", "lib/merb_threshold/helpers", "lib/merb_threshold/helpers/recaptcha_helper.rb", "lib/merb_threshold/helpers/wait_helper.rb", "lib/merb_threshold/merbtasks.rb", "lib/merb_threshold/recaptcha_client.rb", "lib/merb_threshold/templates", "lib/merb_threshold/templates/_recaptcha_partial.html.erb", "lib/merb_threshold/templates/_wait_partial.html.erb", "lib/merb_threshold.rb", "spec/controller", "spec/controller/merb_controller_spec.rb", "spec/frequency_spec.rb", "spec/helpers", "spec/helpers/recaptcha_helper_spec.rb", "spec/helpers/wait_helper_spec.rb", "spec/recaptcha_client_spec.rb", "spec/spec_helper.rb"]
   s.has_rdoc = true
   s.homepage = %q{http://github.com/coryodaniel}
   s.require_paths = ["lib"]

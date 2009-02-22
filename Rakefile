@@ -11,7 +11,7 @@ require 'merb-core'
 require 'merb-core/tasks/merb'
 
 GEM_NAME = "merb_threshold"
-GEM_VERSION = "0.1.1"
+GEM_VERSION = "0.1.2"
 AUTHOR = "Cory O'Daniel"
 EMAIL = "contact@coryodaniel.com"
 HOMEPAGE = "http://github.com/coryodaniel"

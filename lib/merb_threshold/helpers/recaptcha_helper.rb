@@ -20,8 +20,8 @@ module Merb
         threshold_name = nil
       end
       
-      # if its currently exceeded display captcha
-      if currently_exceeded? threshold_key(threshold_name)
+      # if it won't permit another, show the captcha
+      if permit_another? threshold_name
         _src_uri        = opts.delete(:ssl) ? RecaptchaClient::API_SSL_SERVER : RecaptchaClient::API_SERVER
           
         _encoded_key    = escape_html(RecaptchaClient.public_key)
