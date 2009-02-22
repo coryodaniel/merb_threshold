@@ -1,6 +1,7 @@
-describe Merb::GlobalHelpers do
+describe Merb::Threshold::Helpers do
   before do
     class WaitController < Merb::Controller
+      
       GhettoSessionStore = {}
       def session
         GhettoSessionStore[params[:session_id]] ||={}

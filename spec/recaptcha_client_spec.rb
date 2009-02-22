@@ -30,6 +30,6 @@ describe RecaptchaClient do
     result = RecaptchaClient.solve("127.0.0.1","fake_challenge","fake_response")
     result.should be_instance_of(Array)
     result.first.should be(false)
-    result.last.should == ("invalid_site-private-key")
+    result.last.should == ("invalid-site-private-key")
   end
 end

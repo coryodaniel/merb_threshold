@@ -33,7 +33,7 @@ module Merb
       #   so permit access, the threshold will be registered once threshold() is called
       #   which is usually behind the post request this would be submitted to.
       if opts[:limit]
-        frequency = Frequency.new *opts[:limit]
+        frequency = Frequency.new(*opts[:limit])
         frequency.load! access_history(curr_threshold_key)
     
         frequency.permit?
@@ -142,7 +142,7 @@ module Merb
         return true
       else
         # may or may not be exceeded, but threshold was not relaxed
-        frequency = Frequency.new *opts[:limit]
+        frequency = Frequency.new(*opts[:limit])
         frequency.load! access_history(curr_threshold_key)
 
         request_permitted = frequency.permit?

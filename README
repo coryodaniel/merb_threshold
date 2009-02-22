@@ -9,6 +9,30 @@ Also all of the methods are pretty well documented, so it might be pretty helpfu
 
 === Usage
 
+==== Set up
+
+# Add to init.rb
+require 'merb_threshold'
+
+Merb::Plugins.config[:merb_threshold] = {
+  :public_key           => nil,  	# Recaptcha Public Key
+  :private_key          => nil, 	# Recaptcha Private Key
+  :recaptcha            => true,	# Enable Recaptcha
+
+	# Only needed if using Merb::Threshold::Helpers
+	# both take :partial as an option to specify an alternate partial
+	# wait() 
+	# wait(:partial => "shared/other_wait_partial")
+	#
+  :wait_partial         => 'shared/wait_partial', 			#Path to default partial
+  :captcha_partial      => 'shared/recaptcha_partial'		#Path to default partial
+}
+
+# if you want captcha() and wait() helpers
+class Merb::Controller
+	include Merb::Threshold::Helpers
+end
+
 ==== Modes
 	merb_thresholds supports 3 modes:
 	

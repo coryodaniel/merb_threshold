@@ -1,7 +1,13 @@
-describe Merb::GlobalHelpers do
+# Auto-generated ruby debug require       
+require "ruby-debug"
+Debugger.start
+Debugger.settings[:autoeval] = true if Debugger.respond_to?(:settings)
+
+describe Merb::Threshold::Helpers do
   before do
-    class CaptchaController < Merb::Controller
+    class CaptchaController < Merb::Controller      
       GhettoSessionStore = {}
+
       def session
         GhettoSessionStore[params[:session_id]] ||={}
         GhettoSessionStore[params[:session_id]]        
@@ -9,9 +15,8 @@ describe Merb::GlobalHelpers do
       
       def index
         if threshold
-          captcha :partial => File.join(
-            File.expand_path("."),"lib/merb_threshold/templates/recaptcha_partial"
-          ), :partial_opts => {:format => :html}
+          @partial =File.join(File.expand_path("."),"lib/merb_threshold/templates/recaptcha_partial")
+          captcha :partial => @partial, :partial_opts => {:format => :html}
         end
       end
     end
@@ -21,6 +26,7 @@ describe Merb::GlobalHelpers do
     @response = dispatch_to(CaptchaController, :index,{
       :session_id=>"display-captcha"
     })
+
     @response.should be_successful
     @response.body.should =~ /api.recaptcha/
   end

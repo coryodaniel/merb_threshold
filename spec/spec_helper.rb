@@ -27,13 +27,12 @@ require File.join(File.dirname(__FILE__), '..', 'lib', 'merb_threshold','recaptc
 require File.join(File.dirname(__FILE__), '..', 'lib', 'merb_threshold','helpers','recaptcha_helper')
 require File.join(File.dirname(__FILE__), '..', 'lib', 'merb_threshold','helpers','wait_helper')
 
-include Merb::Threshold
-
-module Merb
+module Merb  
   class Controller
-    include Merb::GlobalHelpers
+    include Merb::Threshold::Helpers
   end
 end
+include Merb::Threshold
 
 class Hash
   def to_json
