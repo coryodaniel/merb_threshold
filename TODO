@@ -1,4 +1,7 @@
 TODO:		
+	* Consider :mode (does it matter) keep timeout for all let captcha or wait determine how laxed?
+	* Consider removing support for params keys since it causes the threshold_key complexity
+ 		* keys can always be made with params programatically threshold "documents/#{document_id}"
 	* Consider adding ability to have various stores for threshold data
 	* Consider HTTP method option to threshold
 	* Support for MerbParts

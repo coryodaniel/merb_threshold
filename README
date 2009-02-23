@@ -28,7 +28,13 @@ Merb::Plugins.config[:merb_threshold] = {
   :captcha_partial      => 'shared/recaptcha_partial'		#Path to default partial
 }
 
-# if you want captcha() and wait() helpers
+
+# Two helpers are included: captcha() and wait()
+# 	Both do pre-checking (permit_another?)  if you want helpers
+# 	that do check current access add them!
+# 	The helpers aren't needed (see API) below, and are just provided as two examples
+# 	of how to use the API.
+#
 class Merb::Controller
 	include Merb::Threshold::Helpers
 end
@@ -51,6 +57,19 @@ end
 		* Only works for action based thresholding
 		* a user must wait an allotted amount of time to continue using the resource
 		* The action can throw halt with anything that a before filter could
+
+
+==== API
+	
+	The four most important methods are
+	* threshold 			- initial call will register threshold.  initial and all subsequent calls return currently_exceeded?
+	* permit_another? - will the threshold permit another request.  Takes threshold name
+	* currently_exceeded? - did the current request exceed threshold.  Takes a threshold name
+	
+	* threshold_key 				- returns key to access stuff in merb_threshold_* session keys
+		threshold_key() 			=> threshold_key for default threshold name
+		threshold_key(:login) => for named threshold
+
 
 ==== Action based thresholding
 	
@@ -131,7 +150,7 @@ end
 		* permit_another? 		- Will the threshold permit another request
 		* currently_exceeded? - Is the current request over the threshold
 	
-	Helpers (Override at your leisuer in Merb::GlobalHelpers)
+	Helpers (Override at your leisure in Merb::Threshold::Helpers)
 		* wait(threshold_name) 		- displays the wait message
 		* captcha(threshold_name) - displays the captcha
 	
@@ -202,13 +221,13 @@ end
 === permit_another? vs currently_exceeded?
 
 	*  permit_another?
-		* Note: takes the threshold_name
+		* Note: takes a threshold_name
 		* determines if an immediate subsequent request would exceed the threshold
 		* Suggested Use: when one request 'protects' another
 			* Example: A GET request that retrieved a form could protect the subsequent POST request
 		
 	*  currently_exceeded?
-		* Note: takes the currenty threshold_key
+		* Note: takes a threshold_name
 		* determines if the current request is in over the threshold
 		* Suggested Use: when throttling the amount of requests a resource gets
 			* Example: An API that allows X amount of free accesses before display a 'please pay me' page
@@ -245,6 +264,9 @@ end
 		default_threshold_name	= "user/create"
 		threshold_name					= nil
 		threshold_key						= "user/create"
+		
+		Whenever accessing any of the data stored in the session the threshold_key should be used.  All public
+		api methods provided by merb_threshold take a threshold_name
 
  * Thresholds can be named whatever you want, so they can be programmatically created.  Also
 	the option :params => [:blog_id,:etc] is available that will use param values as part of the key

@@ -16,14 +16,12 @@ module Merb
           threshold_name = nil
         end
 
-        curr_thresh_key = threshold_key(threshold_name)
-
         # if it wont permit another show wait
         if !permit_another? threshold_name
           _wait_partial = opts.delete(:partial) || Merb::Plugins.config[:merb_threshold][:wait_partial]
           _partial_opts = opts.delete(:partial_opts) || {}
           _partial_opts.merge!({
-            :seconds_to_wait => (waiting_period[curr_thresh_key] || 0)
+            :seconds_to_wait => (waiting_period[threshold_key(threshold_name)] || 0)
           })
           partial(_wait_partial,_partial_opts)
         end

@@ -147,8 +147,8 @@ describe Merb::Controller do
     
     dispatch_to(TestController, :create, {:session_id => "threshold_exceed?"})
     @response = dispatch_to(TestController, :create, {:session_id => "threshold_exceed?"})
-    curr_thresh_key = @response.threshold_key
-    @response.currently_exceeded?(curr_thresh_key).should be(true)
+
+    @response.currently_exceeded?.should be(true)
   end
   
   it 'should be able to specify params as portions of the key in Controller.threshold' do

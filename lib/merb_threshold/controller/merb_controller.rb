@@ -22,6 +22,8 @@ module Merb
     #
     # @param threshold_name [~Symbol] The threshold to look up
     #
+    # @api public
+    #
     # @param [Boolean]
     def permit_another?(threshold_name=nil)
       threshold_name ||= default_threshold_name
@@ -49,17 +51,29 @@ module Merb
     #
     # @note See READEME: permit_another? vs currently_exceeded?
     #
-    # @param curr_threshold_key [~Symbol]
+    # @param threshold_name [~Symbol]
     #   current threshold key to lookup
     #
+    # @api public
+    #
     # @return [Boolean]
-    def currently_exceeded?(curr_thresh_key)
-      exceeded_thresholds.member? curr_thresh_key
+    def currently_exceeded?(threshold_name=nil)
+      curr_threshold_key = threshold_key(threshold_name)
+      exceeded_thresholds.member? curr_threshold_key
     end
     
     
     ##
     # Shortcut to session[:merb_threshold_waiting_period]
+    #
+    # @note
+    #   values stored in here are keyed with #threshold_key
+    #   waiting_period[your_threshold_name] is not guaranteed to work instead use
+    #   waiting_period[threshold_key(your_threshold_name)]
+    #
+    # @see #threshold_key
+    #
+    # @api semi-public
     #
     # @return [Hash]
     def waiting_period
@@ -67,9 +81,16 @@ module Merb
     end
         
     ##
-    # gets the users threshold_key for the given threshold
+    # get the key representation of the threshold name.  Used to store data
+    #   in session.  This should be used whenever accessing data stored in the session
+    #   hash.
+    #
+    # @note
+    #   This is needed to support Params values as a part of the threshold name
     #
     # @param threshold_name [~Symbol] name of the threshold to get key for
+    #
+    # @api semi-public
     #
     # @return [~Symbol]
     def threshold_key(threshold_name = nil)  
@@ -117,6 +138,8 @@ module Merb
     #   * :mode => :halt is only an options of the class level threshold method, since it HALTS
     #       filter chains
     #
+    # @api public
+    #
     # @returns [Boolean]
     #
     def threshold(threshold_name = nil, opts={})      
@@ -125,7 +148,7 @@ module Merb
       curr_threshold_key = threshold_key threshold_name
             
       # Was this resource previously exceeded
-      if currently_exceeded? curr_threshold_key
+      if currently_exceeded? threshold_name
         case opts[:mode]
         when :captcha
           @relax_threshold = solve_with_captcha! curr_threshold_key
@@ -154,9 +177,9 @@ module Merb
         #Only keep the last n number of access where n is frequency.occurence
         access_history(curr_threshold_key).replace frequency.current_events
     
-        # if exceeded and not exceeded, track exceeded threshold
-        if !request_permitted && !currently_exceeded?(curr_threshold_key)
-          exceeded_thresholds << curr_threshold_key
+        if !request_permitted
+          # if request wasn't permitted and isn't already marked exceeded, mark it
+          exceeded_thresholds << curr_threshold_key unless currently_exceeded?(threshold_name)
           
           #set the wait time if its a waitable mode
           if opts[:mode] == :wait || opts[:mode] == :halt
@@ -254,6 +277,7 @@ module Merb
     #     before nil, :unless => lambda{... cool logic...} do
     #       threshold
     #     end
+    # @api public
     #
     def self.threshold(*args)
       opts = args.last.is_a?(Hash) ? args.pop : {}
@@ -287,6 +311,8 @@ module Merb
     #   this is a shortcut to the session hash, thus it needs the threshold_key not the 
     #   threshold_name
     #
+    # @see #threshold_key
+    #
     # @api private
     #
     # @return [Array[Fixnum]]
@@ -302,6 +328,8 @@ module Merb
     # @note
     #   this is a shortcut to the session hash, thus it needs the threshold_key not the 
     #   threshold_name
+    #
+    # @see #threshold_key
     #
     # @api private
     #
@@ -322,6 +350,8 @@ module Merb
     # @param opts [Hash] options to tie to it
     #
     # @raises ArgumentError
+    #
+    # @api private
     #
     # @return [Array[~Symbol,Hash]]
     #   The name, opts it was registered as
@@ -360,6 +390,8 @@ module Merb
     #
     # @param threshold_name [~Symbol] name of threshold
     #
+    # @api private
+    #
     # @return [Hash]
     #
     def get_threshold_options(threshold_name)
@@ -374,6 +406,14 @@ module Merb
     #
     # @param curr_threshold_key [~Symbol]
     #   current threshold key to lookup
+    #
+    # @note
+    #   this deals primarily with the session hash, thus it needs the threshold_key not the 
+    #   threshold_name
+    #
+    # @see #threshold_key
+    #
+    # @api private
     #
     # @return [Boolean]
     def solve_with_captcha!(curr_threshold_key)
@@ -401,7 +441,16 @@ module Merb
     # @param curr_threshold_key [~Symbol]
     #   current threshold key to lookup
     #
+    # @note
+    #   this deals primarily with the session hash, thus it needs the threshold_key not the 
+    #   threshold_name
+    #
+    # @see #threshold_key
+    #
+    # @api private
+    #
     # @return [Boolean]
+    #
     def relax_from_waiting!(curr_threshold_key)
       last_access   = access_history(curr_threshold_key).last
       time_to_wait  = (waiting_period[curr_threshold_key] || 0)
