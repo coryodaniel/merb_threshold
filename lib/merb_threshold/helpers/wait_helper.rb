@@ -16,8 +16,22 @@ module Merb
           threshold_name = nil
         end
 
+        # Has the thresholded resource been accessed 
+        # if so 
+        #   display captcha if currently_exceeded?
+        # else
+        #   dispaly captcha unless permit_another?
+        #
+        curr_threshold_key = threshold_key(threshold_name)
+        
+        if @checked_thresholds.member?(curr_threshold_key)
+          @show_wait = currently_exceeded?(threshold_name)
+        else
+          @show_wait = !permit_another?(threshold_name)
+        end
+
         # if it wont permit another show wait
-        if !permit_another? threshold_name
+        if @show_wait
           _wait_partial = opts.delete(:partial) || Merb::Plugins.config[:merb_threshold][:wait_partial]
           _partial_opts = opts.delete(:partial_opts) || {}
           _partial_opts.merge!({

@@ -146,7 +146,11 @@ module Merb
       threshold_name, opts  = register_threshold threshold_name, opts
       
       curr_threshold_key = threshold_key threshold_name
-            
+      
+      # keep track of thresholds checked by this request
+      @checked_thresholds ||={}
+      @checked_thresholds << curr_threshold_key
+      
       # Was this resource previously exceeded
       if currently_exceeded? threshold_name
         case opts[:mode]

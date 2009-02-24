@@ -9,10 +9,11 @@ module Merb
       # @params opts [Hash] passed to partial as 'threshold_options'
       #   Pass any params intended for RecaptchaOptions
       #   Additionally may pass:
+      #     :
       #     :partial => "./path/to/alternate/partial"
       #     :ssl      => TRue|False
       #     :partial_opts => {} #options to pass to partial()
-      #     Theses keys are deleted before being passed to RecapthaOptions
+      #       #Theses keys are deleted before being passed to RecapthaOptions
       #
       # @return [String]
       def captcha(threshold_name = nil, opts={})
@@ -20,9 +21,23 @@ module Merb
           opts = threshold_name
           threshold_name = nil
         end
+        
+        # Has the thresholded resource been accessed 
+        # if so 
+        #   display captcha if currently_exceeded?
+        # else
+        #   dispaly captcha unless permit_another?
+        #
+        curr_threshold_key = threshold_key(threshold_name)
+        
+        if @checked_thresholds.member?(curr_threshold_key)
+          @show_captcha = currently_exceeded?(threshold_name)
+        else
+          @show_captcha = !permit_another?(threshold_name)
+        end
       
         # if it won't permit another, show the captcha
-        if !permit_another? threshold_name
+        if @show_captcha
           _src_uri        = opts.delete(:ssl) ? RecaptchaClient::API_SSL_SERVER : RecaptchaClient::API_SERVER
           
           _encoded_key    = escape_html(RecaptchaClient.public_key)
