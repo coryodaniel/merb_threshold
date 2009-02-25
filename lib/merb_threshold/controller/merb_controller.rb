@@ -8,8 +8,7 @@ module Merb
     
     #Use to keep an index of thresholds for looking up information
     # by name
-    class_inheritable_accessor :_threshold_map
-    self._threshold_map = Mash.new
+    @@_threshold_map = Mash.new
     
     class << self
       ##
@@ -47,13 +46,16 @@ module Merb
         end
 
         #register it
-        self._threshold_map[threshold_name] = opts
+        @@_threshold_map[threshold_name] = opts
       end
       
       ##
-      # A succinct wrapper to bulk register thresholds on actions and check those thresholds
-      # in before filters.  This will create thresholds named by action name.  If no action
-      # names are given a threshold is created over the entire controller by controller name
+      # A succinct wrapper to bulk register thresholds on actions and check access to those thresholds
+      # in before filters.  This method will register the threshold and create the before filters.
+      # 
+      # The threshold names will be "#{controlLer_name}/#{action_name}" when actions are given.
+      #
+      # If not actions are specified the threshold will be named for the controller.
       #
       # @param *args [~Array]
       #   args array for handling array of action names and threshold options
@@ -91,13 +93,13 @@ module Merb
       #     threshold_actions :index, :create, :limit => [5, 30.seconds]
       #
       #     #equivalent to:
-      #     register_threshold :index, :limit => [5, 30.seconds]
+      #     register_threshold :"my_controller/index", :limit => [5, 30.seconds]
       #     before(nil,{:only => [:index]}) do
-      #       threshold_actions :index
+      #       permit_access? :"my_controller/index"
       #     end
-      #     register_threshold :create, :limit => [5, 30.seconds]
+      #     register_threshold :"my_controller/create", :limit => [5, 30.seconds]
       #     before(nil,{:only => [:create]}) do
-      #       threshold_actions :create
+      #       permit_access? :"my_controller/create"
       #     end
       #
       #   #create a controller level threshold
@@ -107,7 +109,7 @@ module Merb
       #     #equivalent to:
       #     register_threshold :my_controller, :limit => [5000, 1.day]
       #     before(nil,{}) do
-      #       threshold_actions :my_controller
+      #       permit_access? :my_controller
       #     end
       #
       #   #create 1 action level threshold with :unless statement and halt
@@ -117,9 +119,9 @@ module Merb
       #     :halt_with => "Too many searches"
       #
       #   #equivalent to:
-      #   register_threshold :search, :limit => [10, 5.minutes]
+      #   register_threshold :"my_controller/search", :limit => [10, 5.minutes]
       #   before(nil,{:only => [:search], :unless => :is_admin?}) do
-      #     if !permit_access?(:search)
+      #     if !permit_access?(:"my_controller/search")
       #       throw(:halt, "Too many searches")
       #     end
       #   end    
@@ -154,10 +156,12 @@ module Merb
         else
           #register a threshold for each action given
           thresholds_to_register.each do |action_to_register|
-            self.register_threshold(action_to_register,threshold_opts)
+            tmp_threshold_name = "#{controller_name}/#{action_to_register}".to_sym
+            
+            self.register_threshold(tmp_threshold_name,threshold_opts)
 
             self.before(nil, filter_opts.merge({:only => [action_to_register]})) do 
-              if !permit_access?(action_to_register) && halt_with
+              if !permit_access?(tmp_threshold_name) && halt_with
                 throw(:halt,halt_with)
               end
             end
@@ -183,7 +187,7 @@ module Merb
     # @param [Boolean]
     def will_permit_another?(threshold_name=nil)
       threshold_name ||= action_name
-      opts = self._threshold_map[threshold_name]
+      opts = @@_threshold_map[threshold_name]
       curr_threshold_key = threshold_key(threshold_name)
 
       # if opts[:limit] is not set that means the threshold hasn't been registered yet
@@ -257,7 +261,7 @@ module Merb
       curr_threshold_key = threshold_name.to_s
 
       # create key to lookup threshold data from users session
-      opts = self._threshold_map[threshold_name]
+      opts = @@_threshold_map[threshold_name]
       if opts[:params]
         opts[:params].each{ |param_key| curr_threshold_key += "/#{params[param_key]}" }
       end
@@ -275,10 +279,10 @@ module Merb
     # @returns [Boolean] was the access permitted?
     #
     def permit_access?(threshold_name=nil)
-      threshold_name ||= action_name.to_sym
+      threshold_name ||= "#{controller_name}/#{action_name}".to_sym
       
       curr_threshold_key = threshold_key(threshold_name)
-      opts = self._threshold_map[threshold_name]
+      opts = @@_threshold_map[threshold_name]
       
       if opts.nil?
         raise Exception, "Threshold (#{threshold_name}) was not registered"

@@ -10,7 +10,7 @@ describe Merb::Threshold::Helpers do
       end
       
       def index
-        if !permit_access?
+        if !permit_access?(:index)
           wait :partial => File.join(
             File.expand_path("."),"lib/merb_threshold/templates/wait_partial"
           ), :partial_opts => {:format => :html}
