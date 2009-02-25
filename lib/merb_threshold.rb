@@ -15,9 +15,11 @@ if defined?(Merb::Plugins)
   require 'merb-helpers/time_dsl'
   
   require "merb_threshold/frequency"
+  require "merb_threshold/per"
   require "merb_threshold/controller/merb_controller"
   require "merb_threshold/helpers/wait_helper"  
   
+  Numeric.send :include, Merb::Threshold::Per
   include Merb::Threshold
   
   Merb::Plugins.add_rakefiles "merb_threshold/merbtasks"

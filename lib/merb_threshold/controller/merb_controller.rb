@@ -1,15 +1,174 @@
 module Merb
   class Controller
-    THRESHOLD_OPTIONS = [:if, :unless, :mode, :exceed, :limit, :halt_with, :params]
+    THRESHOLD_OPTIONS = [:limit, :params]
     THRESHOLD_DEFAULTS = {
-      :mode       => :captcha,
-      :limit      => [0,0.seconds]
+      :limit      => [0,0.seconds],  #[Access, PerSecond]
+      :params     => nil            #[:list, :of, :params, :to, :use, :in, :key]
     }
     
     #Use to keep an index of thresholds for looking up information
     # by name
     class_inheritable_accessor :_threshold_map
-    self._threshold_map = {}        
+    self._threshold_map = Mash.new
+    
+    class << self
+      ##
+      # Registers a threshold for tracking
+      #
+      # @param threshold_name [~Symbol] name of threshold
+      #
+      # @param opts [Hash] Options on how to enforce threshold
+      #   * :params     [Array[~Symbol]] Parameters to include in the threshold key
+      #     :params => [:blog_id]
+      #
+      #   * :limit    [Array[Fixnum,Fixnum,Symbol]] number of access per time interval before
+      #               threshold constraints are applied
+      #               Default [0,0.seconds] #Always
+      #     :limit => [2,5,:minutes]            #=> Frequency(2,5,:minutes)   2 per 5 minutes
+      #     :limit => [1, 5.minutes]          #=> Frequency(1,5.minutes)   1 per 5 minutes
+      #
+      # @raises ArgumentError
+      #
+      # @api public
+      #
+      # @return [Array[~Symbol,Hash]]
+      #   The name, opts it was registered as
+      def register_threshold(threshold_name,opts={})
+        if threshold_name.is_a?(Hash)
+          raise ArgumentError, "Thresolds must be named!"
+        end
+
+        opts = THRESHOLD_DEFAULTS.merge(opts)
+
+        opts.each_key do |key| 
+          raise(ArgumentError,
+            "You can only specify known threshold options (#{THRESHOLD_OPTIONS.join(', ')}). #{key} is invalid."
+          ) unless THRESHOLD_OPTIONS.include?(key)
+        end
+
+        #register it
+        self._threshold_map[threshold_name] = opts
+      end
+      
+      ##
+      # A succinct wrapper to bulk register thresholds on actions and check those thresholds
+      # in before filters.  This will create thresholds named by action name.  If no action
+      # names are given a threshold is created over the entire controller by controller name
+      #
+      # @param *args [~Array]
+      #   args array for handling array of action names and threshold options
+      #   Threshold queues are keyed with the controller & action name, so each
+      #   action will have its own queue
+      #
+      # @param opts [Hash]
+      #   * :limit    [Array[Fixnum,Fixnum,Symbol]] number of access per time interval before
+      #               threshold constraints are applied
+      #               Default [0,0.seconds] #Always
+      #     :limit => [2,5,:minutes]            #=> Frequency(2,5,:minutes)   2 per 5 minutes
+      #     :limit => [1, 5.minutes]          #=> Frequency(1,5.minutes)   1 per 5 minutes
+      #
+      #   * :halt_with  [String,Symbol,Proc] Halts the filter chain instead of
+      #                 displaying a captcha
+      #                 This option is only used when :mode => :halt
+      #                 takes same params as before filter's throw :halt
+      #                 not specifying :halt_with when the mode is :halt
+      #                 will result in: throw(:halt)
+      #
+      #   * :params     [Array[~Symbol]] Parameters to include in the threshold key
+      #     :params => [:blog_id]
+      #                 
+      #   * :if / :unless - Passed to :if / :unless on before filter
+      #
+      # @note
+      #   using the class method check_threshold registers the threshold 
+      #   (no need for a register_threshold statement) and creates a before filter
+      #   for the given actions where the actual threshold check will take place
+      #
+      # @example
+      #   Using threshold and the before filter it creates:
+      # 
+      #   #Create two action level thresholds
+      #   class MyController < Application
+      #     check_threshold :index, :create, :limit => [5, 30.seconds]
+      #
+      #     #equivalent to:
+      #     register_threshold :index, :limit => [5, 30.seconds]
+      #     before(nil,{:only => [:index]}) do
+      #       check_threshold :index
+      #     end
+      #     register_threshold :create, :limit => [5, 30.seconds]
+      #     before(nil,{:only => [:create]}) do
+      #       check_threshold :create
+      #     end
+      #
+      #   #create a controller level threshold
+      #   class MyController < Application
+      #     check_threshold :limit => [5000, 1.day]
+      #     
+      #     #equivalent to:
+      #     register_threshold :my_controller, :limit => [5000, 1.day]
+      #     before(nil,{}) do
+      #       check_threshold :my_controller
+      #     end
+      #
+      #   #create 1 action level threshold with :unless statement and halt
+      #   class MyController < Application
+      #   check_threshold :search, :limit => [10, 5.minutes], 
+      #     :unless => :is_admin?, 
+      #     :halt_with => "Too many searches"
+      #
+      #   #equivalent to:
+      #   register_threshold :search, :limit => [10, 5.minutes]
+      #   before(nil,{:only => [:search], :unless => :is_admin?}) do
+      #     if !check_threshold(:search)
+      #       throw(:halt, "Too many searches")
+      #     end
+      #   end    
+      #
+      #
+      #
+      # @api public
+      #
+      def check_threshold(*args)
+        opts = args.last.is_a?(Hash) ? args.pop : {}
+        thresholds_to_register = args
+
+        #exctract :limit, :params
+        threshold_opts  = {}
+        threshold_opts[:limit]      = opts.delete(:limit) || [0, 0.seconds] #Always
+        threshold_opts[:params]     = opts.delete(:params)
+
+        halt_with                   = opts.delete(:halt_with)
+
+        #get threshold supported before filter options
+        filter_opts = {}
+        filter_opts[:if]            = opts.delete(:if)      if opts[:if]
+        filter_opts[:unless]        = opts.delete(:unless)  if opts[:unless]
+
+        if thresholds_to_register.empty?
+          # Register a controller level threshold
+          self.register_threshold(controller_name,threshold_opts)
+
+          self.before(nil,filter_opts) do
+            if !check_threshold(controller_name) && halt_with
+              throw(:halt, halt_with)
+            end
+          end
+        else
+          #register a threshold for each action given
+          thresholds_to_register.each do |action_to_register|
+            self.register_threshold(action_to_register,threshold_opts)
+
+            self.before(nil, filter_opts.merge({:only => [action_to_register]})) do 
+              if !check_threshold(action_to_register) && halt_with
+                throw(:halt,halt_with)
+              end
+            end
+          end
+        end
+      end
+    
+    end #end class << self
 
 
     ##
@@ -18,24 +177,26 @@ module Merb
     # Good for protecting a post with a form or display captcha/wait before
     #   the threshold is exceeded
     #
-    # @note See READEME: permit_another? vs currently_exceeded?
+    # @note See READEME: will_permit_another? vs is_currently_exceeded?
     #
     # @param threshold_name [~Symbol] The threshold to look up
     #
     # @api public
     #
     # @param [Boolean]
-    def permit_another?(threshold_name=nil)
-      threshold_name ||= default_threshold_name
-      
-      opts = get_threshold_options(threshold_name)
+    def will_permit_another?(threshold_name)      
+      opts = self._threshold_map[threshold_name]
       curr_threshold_key = threshold_key(threshold_name)
 
       # if opts[:limit] is not set that means the threshold hasn't been registered yet
       #   so permit access, the threshold will be registered once threshold() is called
       #   which is usually behind the post request this would be submitted to.
       if opts[:limit]
-        frequency = Frequency.new(*opts[:limit])
+        frequency = if opts[:limit].is_a?(Array)
+          Frequency.new(*opts[:limit])
+        else
+          opts[:limit].clone
+        end
         frequency.load! access_history(curr_threshold_key)
     
         frequency.permit?
@@ -49,7 +210,7 @@ module Merb
     #
     # Good for redirecting access during the current request
     #
-    # @note See READEME: permit_another? vs currently_exceeded?
+    # @note See READEME: will_permit_another? vs is_currently_exceeded?
     #
     # @param threshold_name [~Symbol]
     #   current threshold key to lookup
@@ -57,7 +218,7 @@ module Merb
     # @api public
     #
     # @return [Boolean]
-    def currently_exceeded?(threshold_name=nil)
+    def is_currently_exceeded?(threshold_name)
       curr_threshold_key = threshold_key(threshold_name)
       exceeded_thresholds.member? curr_threshold_key
     end
@@ -93,218 +254,75 @@ module Merb
     # @api semi-public
     #
     # @return [~Symbol]
-    def threshold_key(threshold_name = nil)  
-      curr_threshold_key = threshold_name || default_threshold_name
+    def threshold_key(threshold_name)  
+      curr_threshold_key = threshold_name.to_s
 
       # create key to lookup threshold data from users session
-      opts = get_threshold_options(threshold_name)
+      opts = self._threshold_map[threshold_name]
       if opts[:params]
         opts[:params].each{ |param_key| curr_threshold_key += "/#{params[param_key]}" }
       end
       
-      curr_threshold_key
+      curr_threshold_key.to_sym
     end
-    
+                
     ##
-    # Provides a default threshold key for thresholding methods if not provided
-    #
-    def default_threshold_name
-      @default_threshold_name ||= (controller_name + '/' + action_name)
-    end
-            
-    ##
-    # Controls access to a resource via thresholding.  
-    #   Returns whether the request was restricted by the threshold
+    # Tests if the thresold will permit access  
     #
     # @param threshold_name [~Symbol] Name of threshold to monitor
     #
-    # @param opts [Hash] Options on how to enforce threshold
-    #   * :mode     [Symbol]    :captcha, :wait
-    #               Action to take when threshold is exceeded:
-    #                 :captcha  - displays captcha
-    #                 :wait     - display wait message / resource busy
-    #               Default :captcha
-    #
-    #   * :params     [Array[~Symbol]] Parameters to include in the threshold key
-    #     :params => [:blog_id]
-    #
-    #   * :limit    [Array[Fixnum,Fixnum,Symbol]] number of access per time interval before
-    #               threshold constraints are applied
-    #               Default [0,0.seconds] #Always
-    #     :limit => [2,5,:minutes]            #=> Frequency(2,5,:minutes)   2 per 5 minutes
-    #     :limit => [1, 5.minutes]          #=> Frequency(1,5.minutes)   1 per 5 minutes
-    #
-    # @note
-    #   * :mode => :halt is only an options of the class level threshold method, since it HALTS
-    #       filter chains
-    #
     # @api public
     #
-    # @returns [Boolean]
+    # @returns [Boolean] was the access permitted?
     #
-    def threshold(threshold_name = nil, opts={})      
-      threshold_name, opts  = register_threshold threshold_name, opts
+    def check_threshold(threshold_name=nil)
+      threshold_name ||= action_name.to_sym
       
-      curr_threshold_key = threshold_key threshold_name
+      curr_threshold_key = threshold_key(threshold_name)
+      opts = self._threshold_map[threshold_name]
       
-      # keep track of thresholds checked by this request
-      @checked_thresholds ||={}
-      @checked_thresholds << curr_threshold_key
-      
-      # Was this resource previously exceeded
-      if currently_exceeded? threshold_name
-        case opts[:mode]
-        when :captcha
-          @relax_threshold = solve_with_captcha! curr_threshold_key
-        when :wait
-          @relax_threshold = relax_from_waiting! curr_threshold_key
-        when :halt #thresholds can only be relaxed when :halt by waiting
-          @relax_threshold = relax_from_waiting! curr_threshold_key
-        end
+      if opts.nil?
+        raise Exception, "Threshold (#{threshold_name}) was not registered"
       end
       
-      # the user WAS exceeded, but relaxed the threshold by waiting or captcha'ing
-      if @relax_threshold
-        access_history(curr_threshold_key) << Time.now.to_i
-        return true
-      else
-        # may or may not be exceeded, but threshold was not relaxed
-        frequency = Frequency.new(*opts[:limit])
-        frequency.load! access_history(curr_threshold_key)
-
-        request_permitted = frequency.permit?
-        
-        if request_permitted # Log access
-          access_history(curr_threshold_key) << Time.now.to_i
-        end
-        
-        #Only keep the last n number of access where n is frequency.occurence
-        access_history(curr_threshold_key).replace frequency.current_events
-    
-        if !request_permitted
-          # if request wasn't permitted and isn't already marked exceeded, mark it
-          exceeded_thresholds << curr_threshold_key unless currently_exceeded?(threshold_name)
+      # keep track of thresholds access and if they were relaxed
+      @relaxed_thresholds ||= {}
+      @relaxed_thresholds[curr_threshold_key] = false
           
-          #set the wait time if its a waitable mode
-          if opts[:mode] == :wait || opts[:mode] == :halt
-            waiting_period[curr_threshold_key] = frequency.wait 
-          end
-        end
-    
-        return !request_permitted
-      end
-    end
-    
-    ##
-    # A succinct wrapper for before filters to create threshold on a view
-    #   The views threshold uses the same method as the partial level (threshold)
-    #   except that the name is left nil (which defaults to controller/action name)
-    #
-    # @param *args [~Array]
-    #   args array for handling array of action names and threshold options
-    #   Threshold queues are keyed with the controller & action name, so each
-    #   action will have its own queue
-    #
-    # @param threshold_options [Array]
-    #   Array of actions to apply threshold; passed to before filters :only option
-    #
-    # @param opts [Hash]
-    #   * :mode     [Symbol]    :captcha, :wait, :halt
-    #               Action to take when threshold is exceeded:
-    #                 :captcha  - displays captcha
-    #                 :wait     - display wait message / resource busy
-    #                 :halt     - halts begin filter chain
-    #               Default :captcha
-    #
-    #   * :limit    [Array[Fixnum,Fixnum,Symbol]] number of access per time interval before
-    #               threshold constraints are applied
-    #               Default [0,0.seconds] #Always
-    #     :limit => [2,5,:minutes]            #=> Frequency(2,5,:minutes)   2 per 5 minutes
-    #     :limit => [1, 5.minutes]          #=> Frequency(1,5.minutes)   1 per 5 minutes
-    #
-    #   * :halt_with  [String,Symbol,Proc] Halts the filter chain instead of
-    #                 displaying a captcha
-    #                 This option is only used when :mode => :halt
-    #                 takes same params as before filter's throw :halt
-    #                 not specifying :halt_with when the mode is :halt
-    #                 will result in: throw(:halt)
-    #
-    #   * :params     [Array[~Symbol]] Parameters to include in the threshold key
-    #     :params => [:blog_id]
-    #                 
-    #   * :if / :unless - Passed to :if / :unless on before filter
-    #
-    # @example
-    #   Using threshold and the before filter it creates:
-    #
-    #   class MyController < Application
-    #     #Captcha every time :index is accessed
-    #
-    #     threshold :index
-    #     # Equivalent to:
-    #     before nil, :only => [:index] do
-    #       threshold
-    #     end
-    #
-    #   class MyController < Application
-    #     #Captcha every time controller is accessed
-    #     threshold
-    #     # Equivalent to:
-    #     before { threshold }
-    #
-    #   class MyController < Application
-    #     # Allow 3 uses per 2 minutes, beyond that tell the user they must
-    #     #   wait 2 minutes
-    #
-    #     threshold :index, :create, :mode => :wait, :limit => [3, 2.minutes]
-    #
-    #     # Equivalent to:
-    #     before nil, :only => [:index, :create] do
-    #       threshold :mode => :wait, :limit => [3, 2.minutes]
-    #     end
-    #
-    #   class MyController < Application
-    #     # Allow the access of :create 1 per 30 seconds, beyond that captcha user
-    #     threshold :create, :limit => [1, 30.seconds]
-    #
-    #     # Equivalent to:
-    #     before nil, :only => [:create] do
-    #       threshold :limit => [1, 30.seconds]
-    #     end
-    #
-    #   class MyController < Application
-    #     #captcha the user on every access of this controller except
-    #     # for the given piece of logic
-    #     threshold :unless => lambda{ ... cool logic here ... }
-    #
-    #     # Equivalent to:
-    #     before nil, :unless => lambda{... cool logic...} do
-    #       threshold
-    #     end
-    # @api public
-    #
-    def self.threshold(*args)
-      opts = args.last.is_a?(Hash) ? args.pop : {}
-            
-      #exctract :mode, :limit, :params
-      threshold_opts  = {}
-      threshold_opts[:mode]       = opts.delete(:mode)
-      threshold_opts[:limit]      = opts.delete(:limit) || [0, 0.seconds]#Always
-      threshold_opts[:params]     = opts.delete(:params)
-      
-      halt_with                   = opts.delete(:halt_with)
-      
-      opts[:only] = args unless args.empty?
-      
-      self.before(nil, opts) do 
-        # only care if the mode is :halt, otherwise the view will display :wait or :captcha
-        if threshold(default_threshold_name,threshold_opts) && threshold_opts[:mode] == :halt
-          throw(:halt,halt_with)
-        end
+      # may or may not be exceeded, but threshold was not relaxed
+      frequency = if opts[:limit].is_a?(Array)
+        Frequency.new(*opts[:limit])
+      else
+        opts[:limit].clone
       end
       
+      frequency.load! access_history(curr_threshold_key)
+      
+      # Is this request permitted?
+      if frequency.permit? && !is_currently_exceeded?(threshold_name)
+        # if it is also in the exceeded list
+        access_history(curr_threshold_key) << Time.now.to_i
+        @relaxed_thresholds[curr_threshold_key] = true
+      else
+        # if request wasn't permitted and isn't already marked exceeded, mark it
+        exceeded_thresholds << curr_threshold_key unless is_currently_exceeded?(threshold_name)
+        
+        #set the time until the treshold expires
+        waiting_period[curr_threshold_key] = frequency.wait
+
+        # try to relax threshold via captcha if enabled, then via waiting
+        if Merb::Plugins.config[:merb_threshold][:recaptcha]
+          @relaxed_thresholds[curr_threshold_key] = relax_via_captcha!(curr_threshold_key)
+        end
+        @relaxed_thresholds[curr_threshold_key] ||= relax_via_waiting! curr_threshold_key
+      end
+
+      #Only keep the last n number of access where n is frequency.occurence
+      access_history(curr_threshold_key).replace frequency.current_events  
+      
+      return @relaxed_thresholds[curr_threshold_key]
     end
-    
+        
     ##
     # Looks up the users access history
     #
@@ -345,63 +363,7 @@ module Merb
     end
     
     protected
-        
-    ##
-    # Registers a threshold's options for lookup later
-    #
-    # @param threshold_name [~Symbol] name of threshold
-    #
-    # @param opts [Hash] options to tie to it
-    #
-    # @raises ArgumentError
-    #
-    # @api private
-    #
-    # @return [Array[~Symbol,Hash]]
-    #   The name, opts it was registered as
-    def register_threshold(threshold_name,opts={})
-      if threshold_name.is_a?(Hash) #unnamed thresholds end up with opts as first param
-        opts            = threshold_name
-        threshold_name  = default_threshold_name
-      end
-      
-      threshold_name ||= default_threshold_name
-      
-      unless self._threshold_map.key?(threshold_name)
-        #register it
-        self._threshold_map[threshold_name] = opts 
-        
-        opts = THRESHOLD_DEFAULTS.merge(opts)
-
-        if opts[:mode] == :captcha && !Merb::Plugins.config[:merb_threshold][:recaptcha]
-          raise ArgumentError, "To use threshold mode :captcha you must set Merb::Plugins.config[:merb_threshold][:recaptcha] = true"
-        end
-        
-        opts.each_key do |key| 
-          raise(ArgumentError,
-            "You can only specify known threshold options (#{THRESHOLD_OPTIONS.join(', ')}). #{key} is invalid."
-          ) unless THRESHOLD_OPTIONS.include?(key)
-        end
-        
-        self._threshold_map[threshold_name] = opts
-      end
-      
-      [threshold_name, self._threshold_map[threshold_name]]
-    end
-    
-    ##
-    # retrieves the options the threshold was initially registerd with
-    #
-    # @param threshold_name [~Symbol] name of threshold
-    #
-    # @api private
-    #
-    # @return [Hash]
-    #
-    def get_threshold_options(threshold_name)
-      self._threshold_map[threshold_name] || {}
-    end
-    
+                
     ##
     # Determines if the user's request solved the captcha
     #
@@ -420,20 +382,23 @@ module Merb
     # @api private
     #
     # @return [Boolean]
-    def solve_with_captcha!(curr_threshold_key)
-      did_solve, captcha_error = ::RecaptchaClient.solve(request.remote_ip,
-        params[:recaptcha_challenge_field],
-        params[:recaptcha_response_field]
-      )
+    def relax_via_captcha!(curr_threshold_key)
+      if params[:recaptcha_challenge_field] && params[:recaptcha_response_field]
+        did_solve, captcha_error = ::RecaptchaClient.solve(request.remote_ip,
+          params[:recaptcha_challenge_field],
+          params[:recaptcha_response_field]
+        )
       
-      if did_solve
-        exceeded_thresholds.delete curr_threshold_key
-        access_history(curr_threshold_key).clear
-      else
-        @captcha_error = captcha_error
+        if did_solve
+          relax_threshold(curr_threshold_key)
+        else
+          @captcha_error = captcha_error
+        end
+      
+        did_solve
+      else #no captcha data provided
+        false
       end
-      
-      did_solve
     end
     
     ##
@@ -455,19 +420,29 @@ module Merb
     #
     # @return [Boolean]
     #
-    def relax_from_waiting!(curr_threshold_key)
+    def relax_via_waiting!(curr_threshold_key)
       last_access   = access_history(curr_threshold_key).last
       time_to_wait  = (waiting_period[curr_threshold_key] || 0)
-
+      
+      #if there was no previous acces, this didn't relax from waiting
+      return false if last_access.nil?
+      
       did_relax = (Time.now.to_i > (last_access + time_to_wait))
       
-      if did_relax
-        exceeded_thresholds.delete curr_threshold_key
-        access_history(curr_threshold_key).clear
-        waiting_period.delete(curr_threshold_key)
-      end
+      relax_threshold(curr_threshold_key) if did_relax
       
       did_relax
+    end
+    
+    ##
+    # Resets all tracked attributes on a threshold
+    #
+    # @param curr_threshold_key [~Symbol] they key to clear
+    #
+    def relax_threshold(curr_threshold_key)
+      exceeded_thresholds.delete curr_threshold_key
+      access_history(curr_threshold_key).clear
+      waiting_period.delete(curr_threshold_key)
     end
     
   end # end Merb::Controller

@@ -52,8 +52,8 @@ module Merb
       #
       # @return [~Numeric]
       def wait
-        curr_evts = current_events
-        if curr_evts.length < occurrence
+        num_evts = current_events.length
+        if num_evts == 0 || num_evts < occurrence
           return 0
         else #How long until the oldest falls off?
           # originally had now - period > @mm.first but +1 all over the place was
@@ -61,7 +61,7 @@ module Merb
           # Want: now - period >= @mm.first
           #   now - period + x == @mm.first
           #   => x == @mm.first + period - now
-          return (curr_evts.first + period - Time.now.to_i)
+          return (current_events.first + period - Time.now.to_i)
         end
       end
 

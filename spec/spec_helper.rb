@@ -32,6 +32,8 @@ module Merb
     include Merb::Threshold::Helpers
   end
 end
+Numeric.send :include, Merb::Threshold::Per
+
 include Merb::Threshold
 
 class Hash

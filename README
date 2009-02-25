@@ -30,7 +30,7 @@ Merb::Plugins.config[:merb_threshold] = {
 
 
 # Two helpers are included: captcha() and wait()
-# 	Both do pre-checking (permit_another?)  if you want helpers
+# 	Both do pre-checking (will_permit_another?)  if you want helpers
 # 	that do check current access add them!
 # 	The helpers aren't needed (see API) below, and are just provided as two examples
 # 	of how to use the API.
@@ -62,9 +62,9 @@ end
 ==== API
 	
 	The four most important methods are
-	* threshold 			- initial call will register threshold.  initial and all subsequent calls return currently_exceeded?
-	* permit_another? - will the threshold permit another request.  Takes threshold name
-	* currently_exceeded? - did the current request exceed threshold.  Takes a threshold name
+	* threshold 			- initial call will register threshold.  initial and all subsequent calls return is_currently_exceeded?
+	* will_permit_another? - will the threshold permit another request.  Takes threshold name
+	* is_currently_exceeded? - did the current request exceed threshold.  Takes a threshold name
 	
 	* threshold_key 				- returns key to access stuff in merb_threshold_* session keys
 		threshold_key() 			=> threshold_key for default threshold name
@@ -147,8 +147,8 @@ end
 	
 	Methods:
 		* threshold						- Returns True|False, was the request OVER the threshold
-		* permit_another? 		- Will the threshold permit another request
-		* currently_exceeded? - Is the current request over the threshold
+		* will_permit_another? 		- Will the threshold permit another request
+		* is_currently_exceeded? - Is the current request over the threshold
 	
 	Helpers (Override at your leisure in Merb::Threshold::Helpers)
 		* wait(threshold_name) 		- displays the wait message
@@ -218,31 +218,31 @@ end
 	end
 
 
-=== permit_another? vs currently_exceeded?
+=== will_permit_another? vs is_currently_exceeded?
 
-	*  permit_another?
+	*  will_permit_another?
 		* Note: takes a threshold_name
 		* determines if an immediate subsequent request would exceed the threshold
 		* Suggested Use: when one request 'protects' another
 			* Example: A GET request that retrieved a form could protect the subsequent POST request
 		
-	*  currently_exceeded?
+	*  is_currently_exceeded?
 		* Note: takes a threshold_name
 		* determines if the current request is in over the threshold
 		* Suggested Use: when throttling the amount of requests a resource gets
 			* Example: An API that allows X amount of free accesses before display a 'please pay me' page
 
-==== A case for permit_another?
+==== A case for will_permit_another?
 
 	* A sign up page has a limit of 5 signups per minute.
 	* A user signs up 5 accounts in a row (w/ no captcha | wait)
 	* On the sixth GET of the form the request's call to captcha() determines another request will exceeded the threshold, so a captcha is presented
 	
-==== A case for permit_another?
+==== A case for will_permit_another?
 
 	* A user is promised access to a free API 5000 times per day
 	* The user's app makes 5000 requests
-	* On the 5001 request currently_exceeded? could be used to render an 'over the limit' partial
+	* On the 5001 request is_currently_exceeded? could be used to render an 'over the limit' partial
 
 
 === Misc. Notes

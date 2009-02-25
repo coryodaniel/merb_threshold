@@ -5,7 +5,8 @@ Debugger.settings[:autoeval] = true if Debugger.respond_to?(:settings)
 
 describe Merb::Threshold::Helpers do
   before do
-    class CaptchaController < Merb::Controller      
+    class CaptchaController < Merb::Controller
+      register_threshold :index
       GhettoSessionStore = {}
 
       def session
@@ -14,7 +15,7 @@ describe Merb::Threshold::Helpers do
       end
       
       def index
-        if threshold
+        if !check_threshold(:index)
           @partial =File.join(File.expand_path("."),"lib/merb_threshold/templates/recaptcha_partial")
           captcha :partial => @partial, :partial_opts => {:format => :html}
         end

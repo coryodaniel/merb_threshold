@@ -19,21 +19,31 @@ module Merb
       def captcha(threshold_name = nil, opts={})
         if threshold_name.is_a?(Hash)
           opts = threshold_name
-          threshold_name = nil
+          threshold_name = action_name
         end
-        
-        # Has the thresholded resource been accessed 
-        # if so 
-        #   display captcha if currently_exceeded?
-        # else
-        #   dispaly captcha unless permit_another?
-        #
+
         curr_threshold_key = threshold_key(threshold_name)
         
-        if @checked_thresholds.member?(curr_threshold_key)
-          @show_captcha = currently_exceeded?(threshold_name)
+        # Has the thresholded resource been accessed during this request
+        # if so 
+        #   if it was relaxed
+        #     dont show partial
+        #   else
+        #     show partial
+        # else #resource wasn't access
+        #   if permit_another?
+        #     dont show partial
+        #   else 
+        #     show partial
+        #       
+        @show_captcha = if @relaxed_thresholds && @relaxed_thresholds.key?(curr_threshold_key)
+          if @relaxed_thresholds[curr_threshold_key]
+            false #dont show partial, it was relaxed
+          else 
+            true #show partial, threshold exceeded
+          end
         else
-          @show_captcha = !permit_another?(threshold_name)
+          !will_permit_another?(threshold_name)
         end
       
         # if it won't permit another, show the captcha
