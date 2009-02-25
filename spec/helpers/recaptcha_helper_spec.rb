@@ -15,7 +15,7 @@ describe Merb::Threshold::Helpers do
       end
       
       def index
-        if !check_threshold(:index)
+        if !permit_access?(:index)
           @partial =File.join(File.expand_path("."),"lib/merb_threshold/templates/recaptcha_partial")
           captcha :partial => @partial, :partial_opts => {:format => :html}
         end

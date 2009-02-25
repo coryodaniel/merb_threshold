@@ -1,13 +1,14 @@
 merb_threshold
 ==============
 
-Merb Threshold provides an easy way to apply control the number of times an action or partial
-is accessed by a particular session.  Thresholds can be applied to multiple partials per page and can
-even span controllers and actions.
+Merb Threshold provides an easy way to apply control the number of times something is done in a merb
+app, this includes dispatching to actions, rendering partials, etc.
+
+Thresholds can be applied to multiple partials per page and can even span controllers and actions.
 
 Also all of the methods are pretty well documented, so it might be pretty helpful to look at the method documentation.
 
-=== Usage
+When a threshold is exceeded it can be relaxed either by captcha or waiting, depending on the partial that is rendered.
 
 ==== Set up
 
@@ -30,107 +31,90 @@ Merb::Plugins.config[:merb_threshold] = {
 
 
 # Two helpers are included: captcha() and wait()
-# 	Both do pre-checking (will_permit_another?)  if you want helpers
-# 	that do check current access add them!
 # 	The helpers aren't needed (see API) below, and are just provided as two examples
-# 	of how to use the API.
+# 	of how to use the API to render wait and captch partials
 #
 class Merb::Controller
 	include Merb::Threshold::Helpers
 end
 
-==== Modes
-	merb_thresholds supports 3 modes:
+
+==== Public API
 	
-	* wait 
-		* a user must wait an allotted amount of time to continue using the resource
-		* Merb::GlobalHelper#wait() is included (as a default) to display a partial if the user must wait
-		* Generate a default partial with rake merb_threshold:generate_wait OUT=./app/views/shared
-		
-	* captcha
-		* a user is presented with a captcha to continue using the resource
-		* uses Recaptcha as the backend
-		* Merb::GlobalHelper#captcha() is included (as a default) to display a captcha partial
-		* Generate a default partial with rake merb_threshold:generate_captcha OUT=./app/views/shared		
-		
-	* halt
-		* Only works for action based thresholding
-		* a user must wait an allotted amount of time to continue using the resource
-		* The action can throw halt with anything that a before filter could
-
-
-==== API
+	Instance Methods
+	* Merb::Controller#permit_access?					
+		- is access permitted to the resources 	
+		- Takes a threshold name
+	* Merb::Controller#will_permit_another? 	
+		- will the threshold permit another request.  
+		- Takes threshold name
+	* Merb::Controller#is_currently_exceeded? 
+		- is the threshold currently exceeded (may have been exceeded by a previous request)
+		- Take threshold name
 	
-	The four most important methods are
-	* threshold 			- initial call will register threshold.  initial and all subsequent calls return is_currently_exceeded?
-	* will_permit_another? - will the threshold permit another request.  Takes threshold name
-	* is_currently_exceeded? - did the current request exceed threshold.  Takes a threshold name
+	Class Methods
+	* Merb::Controller.register_threshold 		- registers a threshold, all thresholds must be 'registered'	
+	* Merb::Controller.threshold_actions 			- This is a helper method.  It registers the thresholds automatically
+			and creates before filters to check permit_access?.  If no actions are listed thresholds, are maintained
+			on the controller itself (shared between actions).  Optionally a list of action names can be given and an
+			threshold will be created for each one.
 	
-	* threshold_key 				- returns key to access stuff in merb_threshold_* session keys
-		threshold_key() 			=> threshold_key for default threshold name
-		threshold_key(:login) => for named threshold
 
-
-==== Action based thresholding
+==== Thresholding at the Controller / Action level
 	
 	Action based thresholding allows for controlling access to an action as a whole.  The class level 'threshold' method
 	is actually just a wrapper around a before filter that calls the instances level threshold.  Providing the
 	wrapper does allow for the threshold to halt the filter chain.  
-	
-	In an action based threshold the threshold_name is always "#{controller_name}/#{action_name}".
-	
+		
 	Example:
-	
-	class Users < Application
-		threshold :create, :limit => [1, 30.seconds]
-		
-		# Equivalent to:
-		# before(nil,{:only => [:create]}) do
-		# 	threshold(default_threshold_name,{:limit => [1,30.seconds]})
-		# end
-		
-		def index
-			render
-		end
-		
-		def create
-		 #... handle user sign up
-		end
-	end
-	
-	# ... in app/views/users/index.html.erb
-	# If the form was accessed more than once in 30 seconds, a captcha would be displayed
-	<form ...>
-		<input .../>
-		<%= captcha(:create) %>
-	</form>
-	
-	class SuperSensitiveApi < Application
-		# 
-		# * this would create a 1 / 30 seconds threshold on all actions in the controller
-		# * the halt_with parameter can take anything that throw(:halt) would take
-		# * at the class level 'threshold()' is a wrapper around before()
-		#
-		threshold :limit => [1, 30.seconds], :mode => :halt, :halt_with => "Slow down there pilgrim."
-		
-		# Equivalent to:
-		# before(nil,{}) do
-		#		if threshold(default_threshold_name,{:mode => :halt, :limit => [1, 30.seconds]})
-    #  		throw(:halt, "Slow down there pilgrim")
-    # end
-
-	end
-	
+    class MyController < Application
+			threshold_actions :index, :create, :limit => [5, 30.seconds]
+    
+      #equivalent to:
+      register_threshold :index, :limit => [5, 30.seconds]
+      before(nil,{:only => [:index]}) do
+      	threshold_actions :index
+      end
+       
+			register_threshold :create, :limit => [5, 30.seconds]
+      before(nil,{:only => [:create]}) do
+        threshold_actions :create
+      end
+    
+    #create a controller level threshold
+    class MyController < Application
+      threshold_actions :limit => [5000, 1.day]
+        
+      #equivalent to:
+      register_threshold :my_controller, :limit => [5000, 1.day]
+      before(nil,{}) do
+        threshold_actions :my_controller
+      end
+    
+    #create 1 action level threshold with :unless statement and halt
+    class MyController < Application
+    	threshold_actions :search, :limit => [10, 5.minutes], 
+      	:unless => :is_admin?, 
+      	:halt_with => "Too many searches"
+    
+    	#equivalent to:
+    	register_threshold :search, :limit => [10, 5.minutes]
+    	before(nil,{:only => [:search], :unless => :is_admin?}) do
+      	if !permit_access?(:search)
+        	throw(:halt, "Too many searches")
+      	end
+    	end
 	
 ==== Partial / View based thresholding
 
 	Partial / View based thresholding can take advantage of action based thresholds or named thresholds.
-	
+	class Whatever < Application
+		register_threshold :stuff_to_protect, :limit => 1.per(3.minutes)
 	# --- apps/views/whatever/index.html.erb
 	<!--
 		Cool html stuff
 	-->
-	<% unless threshold :stuff_to_protect, :limit => [1, 3.minutes] %>
+	<% if permit_access? :stuff_to_protect %>
 		<!-- Show your stuff, access wasn't thresholded -->
 		<div> Coolness?! </div>
 	<% else %>
@@ -146,9 +130,9 @@ end
 	is rendered.
 	
 	Methods:
-		* threshold						- Returns True|False, was the request OVER the threshold
+		* permit_access?					- Returns True|False, was the request OVER the threshold
 		* will_permit_another? 		- Will the threshold permit another request
-		* is_currently_exceeded? - Is the current request over the threshold
+		* is_currently_exceeded? 	- Is the current request over the threshold
 	
 	Helpers (Override at your leisure in Merb::Threshold::Helpers)
 		* wait(threshold_name) 		- displays the wait message
@@ -160,43 +144,7 @@ end
 	* A threshold name is used as the identifier so the controller can keep track of registered options
 	* A threshold key is how to look up a particular threshold's data in the user's session
 	
-	By default the threshold key where information is stored in the session is the "controller_name/action_name".
-	This can of course be changed by specifying a name (as described in Partial based thresholding).  The key
-	can also be set on a per parameter value basis as well.  All three examples are below
-	
-	The three attributes:
-	default_threshold_name - only provided as a default in the event a name isn't given
-	threshold_name 	- name of the threshold, if it is ever passed as nil merb_threshold will use default_threshold_name
-	thershold_key 	- this will be the same as the threshold_name except when params based thresholds are being used
-	
-	class Home < Application
-	
-		# An action based threshold
-		def action1
-			threshold :limit => [2, 10.minutes]
-			# default_threshold_name: "home/action1"
-			# threshold_name:					"home/action1"
-			# threshold_key:					"home/action1"
-		end
-		
-		# A named threshold
-		def action2
-			threshold :tuff_threshold, :limit => [1, 1.day]
-			# default_threshold_name: "home/action2"
-			# threshold_name:					"tuff_threshold"
-			# threshold_key: 					"tuff_threshold"
-		end
-		
-		# A param key threshold
-		# Given request to: /documents/499
-		def action3
-			threshold :document_viewer, :limit => [10, 30.minutes], :params => [:document_id]
-			# default_threshold_name: "home/action3"
-			# threshold_name:					"document_viewer"
-			# threshold_key: 					"document_viewer/499" # value is based on value of params[:document_id]
-		end
-	end
-
+	Threshold keys should be used whenever accessing any of the data stored in the users' session.
 
 === Clearing / Destroying sessions
 	
@@ -247,27 +195,6 @@ end
 
 === Misc. Notes
 
- * The objective behind naming thresholds is the ability to use them across controllers and actions
-		This allows the ability to show a captcha on a sign up page, but register the access only when posted
-
- * default_threshold_name vs threshold_key: the key is the key used to find the threshold statistics
-		in a users session.  It is not the same as the threshold_name when the :params options is used
-		
-		# routed to: /blog/index/35
-		threshold :blog_index, :params => [:blog_id]
-		default_threshold_name 	= "blog/index"
-		threshold_name 					= :index  # ( referring to the local variable 'threshold_name')
-		threshold_key						= "blog_index/35"
-		
-		# routed to: /user/create
-		threshold
-		default_threshold_name	= "user/create"
-		threshold_name					= nil
-		threshold_key						= "user/create"
-		
-		Whenever accessing any of the data stored in the session the threshold_key should be used.  All public
-		api methods provided by merb_threshold take a threshold_name
-
  * Thresholds can be named whatever you want, so they can be programmatically created.  Also
 	the option :params => [:blog_id,:etc] is available that will use param values as part of the key
 		
@@ -278,11 +205,8 @@ end
 
  * A threshold is EXCEEDED when it goes beyond its limit
  		Given:
-			threshold :limit => [3,30.seconds]
+			register_threshold :index, :limit => [3,30.seconds]
 		The threshold would be considered EXCEEDED on its 4th request.
-		
- * the 'threshold' class method is just a wrapper for before filters
-		See MerbController#threshold for examples
 				
  * Time.now is used for all times since access times are relative
 		The frequency class could be a lot more useful if it didn't explicitly use Time.now and you could

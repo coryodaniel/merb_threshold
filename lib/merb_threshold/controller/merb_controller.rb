@@ -67,9 +67,8 @@ module Merb
       #     :limit => [2,5,:minutes]            #=> Frequency(2,5,:minutes)   2 per 5 minutes
       #     :limit => [1, 5.minutes]          #=> Frequency(1,5.minutes)   1 per 5 minutes
       #
-      #   * :halt_with  [String,Symbol,Proc] Halts the filter chain instead of
-      #                 displaying a captcha
-      #                 This option is only used when :mode => :halt
+      #   * :halt_with  [String,Symbol,Proc] Halts the filter chain instead if the
+      #                 threshold is in effect
       #                 takes same params as before filter's throw :halt
       #                 not specifying :halt_with when the mode is :halt
       #                 will result in: throw(:halt)
@@ -80,7 +79,7 @@ module Merb
       #   * :if / :unless - Passed to :if / :unless on before filter
       #
       # @note
-      #   using the class method check_threshold registers the threshold 
+      #   using the class method threshold_actions registers the threshold 
       #   (no need for a register_threshold statement) and creates a before filter
       #   for the given actions where the actual threshold check will take place
       #
@@ -89,47 +88,45 @@ module Merb
       # 
       #   #Create two action level thresholds
       #   class MyController < Application
-      #     check_threshold :index, :create, :limit => [5, 30.seconds]
+      #     threshold_actions :index, :create, :limit => [5, 30.seconds]
       #
       #     #equivalent to:
       #     register_threshold :index, :limit => [5, 30.seconds]
       #     before(nil,{:only => [:index]}) do
-      #       check_threshold :index
+      #       threshold_actions :index
       #     end
       #     register_threshold :create, :limit => [5, 30.seconds]
       #     before(nil,{:only => [:create]}) do
-      #       check_threshold :create
+      #       threshold_actions :create
       #     end
       #
       #   #create a controller level threshold
       #   class MyController < Application
-      #     check_threshold :limit => [5000, 1.day]
+      #     threshold_actions :limit => [5000, 1.day]
       #     
       #     #equivalent to:
       #     register_threshold :my_controller, :limit => [5000, 1.day]
       #     before(nil,{}) do
-      #       check_threshold :my_controller
+      #       threshold_actions :my_controller
       #     end
       #
       #   #create 1 action level threshold with :unless statement and halt
       #   class MyController < Application
-      #   check_threshold :search, :limit => [10, 5.minutes], 
+      #   threshold_actions :search, :limit => [10, 5.minutes], 
       #     :unless => :is_admin?, 
       #     :halt_with => "Too many searches"
       #
       #   #equivalent to:
       #   register_threshold :search, :limit => [10, 5.minutes]
       #   before(nil,{:only => [:search], :unless => :is_admin?}) do
-      #     if !check_threshold(:search)
+      #     if !permit_access?(:search)
       #       throw(:halt, "Too many searches")
       #     end
       #   end    
       #
-      #
-      #
       # @api public
       #
-      def check_threshold(*args)
+      def threshold_actions(*args)
         opts = args.last.is_a?(Hash) ? args.pop : {}
         thresholds_to_register = args
 
@@ -150,7 +147,7 @@ module Merb
           self.register_threshold(controller_name,threshold_opts)
 
           self.before(nil,filter_opts) do
-            if !check_threshold(controller_name) && halt_with
+            if !permit_access?(controller_name) && halt_with
               throw(:halt, halt_with)
             end
           end
@@ -160,7 +157,7 @@ module Merb
             self.register_threshold(action_to_register,threshold_opts)
 
             self.before(nil, filter_opts.merge({:only => [action_to_register]})) do 
-              if !check_threshold(action_to_register) && halt_with
+              if !permit_access?(action_to_register) && halt_with
                 throw(:halt,halt_with)
               end
             end
@@ -184,7 +181,8 @@ module Merb
     # @api public
     #
     # @param [Boolean]
-    def will_permit_another?(threshold_name)      
+    def will_permit_another?(threshold_name=nil)
+      threshold_name ||= action_name
       opts = self._threshold_map[threshold_name]
       curr_threshold_key = threshold_key(threshold_name)
 
@@ -218,7 +216,8 @@ module Merb
     # @api public
     #
     # @return [Boolean]
-    def is_currently_exceeded?(threshold_name)
+    def is_currently_exceeded?(threshold_name=nil)
+      threshold_name ||= action_name
       curr_threshold_key = threshold_key(threshold_name)
       exceeded_thresholds.member? curr_threshold_key
     end
@@ -267,7 +266,7 @@ module Merb
     end
                 
     ##
-    # Tests if the thresold will permit access  
+    # Is access permitted to the threshold protected resource.
     #
     # @param threshold_name [~Symbol] Name of threshold to monitor
     #
@@ -275,7 +274,7 @@ module Merb
     #
     # @returns [Boolean] was the access permitted?
     #
-    def check_threshold(threshold_name=nil)
+    def permit_access?(threshold_name=nil)
       threshold_name ||= action_name.to_sym
       
       curr_threshold_key = threshold_key(threshold_name)

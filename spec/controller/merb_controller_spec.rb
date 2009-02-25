@@ -34,12 +34,12 @@ describe Merb::Controller do
     TestController.should respond_to(:register_threshold)
   end
 
-  it 'should respond to TestController.check_threshold' do
-    TestController.should respond_to(:check_threshold)
+  it 'should respond to TestController.threshold_actions' do
+    TestController.should respond_to(:threshold_actions)
   end
   
-  it 'should respond to #threshold' do
-    TestController.new('').should respond_to(:check_threshold)
+  it 'should respond to #permit_access?' do
+    TestController.new('').should respond_to(:permit_access?)
   end
   
   it 'should respond to #is_currently_exceeded?' do
@@ -74,7 +74,7 @@ describe Merb::Controller do
   
   it 'should wrap calls to before filter with threshold' do
     class TestController
-      check_threshold :index
+      threshold_actions :index
     end
     TestController._before_filters.first.last[:only].member?("index")
     TestController._before_filters.first.first.should be_instance_of(Proc)
@@ -85,7 +85,7 @@ describe Merb::Controller do
   end
   
   it 'should be able to determine if a captcha is valid or not' do
-    TestController.check_threshold :index, :limit => 1.per(1.week)
+    TestController.threshold_actions :index, :limit => 1.per(1.week)
     @response =     dispatch_to(TestController, :index,{:session_id=>"submitting_captcha"})
     
     # Logic here is that recaptcha, guarantees when a captcha is solved, just need to confirm
@@ -102,7 +102,7 @@ describe Merb::Controller do
     
   it 'should be able to relax a threshold by waiting' do
     unless ENV['SKIP_WAIT']
-      TestController.check_threshold :index, :limit => 1.per(2.seconds)
+      TestController.threshold_actions :index, :limit => 1.per(2.seconds)
       @response =     dispatch_to(TestController, :index,{:session_id=>"allow_wait_timeout"})
     
       @response.is_currently_exceeded?(:index).should be(false)
@@ -124,7 +124,7 @@ describe Merb::Controller do
   
   it 'should be able to relax a threshold that halts by waiting' do
     unless ENV['SKIP_WAIT']
-      TestController.check_threshold :index, :limit => [1,2.seconds], :halt_with => "Too many requests!"
+      TestController.threshold_actions :index, :limit => [1,2.seconds], :halt_with => "Too many requests!"
       @response =     dispatch_to(TestController, :index,{:session_id=>"allow_wait_timeout_w_halt"})
     
       @response.is_currently_exceeded?(:index).should be(false)
@@ -142,7 +142,7 @@ describe Merb::Controller do
   end
   
   it 'should be able to throw(:halt) when a threshold is exceeded' do
-    TestController.check_threshold :create, 
+    TestController.threshold_actions :create, 
       :halt_with  => "Access Denied", 
       :limit      => [1,30.minutes]
 
@@ -153,7 +153,7 @@ describe Merb::Controller do
   end
   
   it 'should set the wait time when the threshold has been exceeded and in wait mode' do
-    TestController.check_threshold :create, :limit => [1,30.minutes]
+    TestController.threshold_actions :create, :limit => [1,30.minutes]
     @response = dispatch_to(TestController, :create, {:session_id => "wait_bitch"})
     @response = dispatch_to(TestController, :create, {:session_id => "wait_bitch"})
 
@@ -161,7 +161,7 @@ describe Merb::Controller do
   end
   
   it 'should be able to determine if a threshold has been exceeded' do
-    TestController.check_threshold :create, :limit => 1.per(30.minutes)
+    TestController.threshold_actions :create, :limit => 1.per(30.minutes)
     
     dispatch_to(TestController, :create, {:session_id => "threshold_exceed?"})
     @response = dispatch_to(TestController, :create, {:session_id => "threshold_exceed?"})
@@ -170,7 +170,7 @@ describe Merb::Controller do
   end
   
   it 'should be able to specify params as portions of the key in Controller.threshold' do
-    TestController.check_threshold :blog, 
+    TestController.threshold_actions :blog, 
       :params => [:blog_id],
       :limit => [1,30.minutes]
       
@@ -184,7 +184,7 @@ describe Merb::Controller do
   end
   
   it 'should add an access time when the threshold has not been exceeded' do
-    TestController.check_threshold :create, :limit => [30,1.minute]
+    TestController.threshold_actions :create, :limit => [30,1.minute]
     30.times do |access_counter|
       @response = dispatch_to(TestController, :create,{:session_id=>"record_access_to_resource"})
       @response.access_history(:create).should have(access_counter + 1).accesses
@@ -192,19 +192,19 @@ describe Merb::Controller do
   end
   
   it 'should not add an access time when the threshold has been exceeded' do
-    TestController.check_threshold :create, :limit => [30,1.minute]
+    TestController.threshold_actions :create, :limit => [30,1.minute]
     30.times do |access_counter|
       @response = dispatch_to(TestController, :create,{:session_id=>"record_access_whilst_not_exceeded"})
       @response.access_history(:create).should have(access_counter + 1).accesses
     end
     
     @response = dispatch_to(TestController, :create,{:session_id=>"record_access_whilst_not_exceeded"})
-    @response.check_threshold(:create).should be(false)
+    @response.permit_access?(:create).should be(false)
     @response.access_history(:create).should have(30).accesses
   end
   
   it 'should be able to determine if it can permit another access' do
-    TestController.check_threshold :index, :limit => 2.per(30.seconds)
+    TestController.threshold_actions :index, :limit => 2.per(30.seconds)
     @response = dispatch_to(TestController, :index,{:session_id=>"default_to_action_name"})
     @response.will_permit_another?(:index).should be(true)
     @response = dispatch_to(TestController, :index,{:session_id=>"default_to_action_name"})
@@ -213,9 +213,9 @@ describe Merb::Controller do
   
   it 'should check the threshold with the action name if not provided' do
     pending
-    #TestController.check_threshold :index, :limit => 1.per(30.minutes)
+    #TestController.threshold_actions :index, :limit => 1.per(30.minutes)
     #@response = dispatch_to(TestController, :index,{:session_id=>"default_to_action_name"})
-    #need an action to call check_threshold
+    #need an action to call permit_access?
   end
   
   it 'should captcha everytime if the :limit is not set' do
@@ -227,7 +227,7 @@ describe Merb::Controller do
   end
     
   it 'should apply the threshold to the controller when not specified' do
-    TestController.check_threshold :limit => [10,30,:seconds]
+    TestController.threshold_actions :limit => [10,30,:seconds]
     dispatch_to(TestController, :index,{
       :session_id=>"threshold_all_actions_test"
     }).access_history(:test_controller).should have(1).accesses
@@ -242,7 +242,7 @@ describe Merb::Controller do
   end
   
   it 'should only apply the threshold to the action(s) specified' do
-    TestController.check_threshold :destroy
+    TestController.threshold_actions :destroy
     TestController._before_filters.first.last[:only].length.should be(1)
     TestController._before_filters.first.last[:only].first.should == "destroy"
   end
@@ -251,7 +251,7 @@ describe Merb::Controller do
   # each should maintain its own history of accesses
   #
   it 'when multiple actions are specified their access histories should be kept separate' do
-    TestController.check_threshold :index, :create, :limit => [2, 30, :seconds]
+    TestController.threshold_actions :index, :create, :limit => [2, 30, :seconds]
 
     dispatch_to(TestController, :index,{:session_id=>"separate_history_test"})
     @response1=dispatch_to(TestController, :index,{:session_id=>"separate_history_test"})
