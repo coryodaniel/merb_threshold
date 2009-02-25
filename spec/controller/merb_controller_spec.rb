@@ -1,7 +1,3 @@
-# Auto-generated ruby debug require       
-require "ruby-debug"
-Debugger.start
-Debugger.settings[:autoeval] = true if Debugger.respond_to?(:settings)
 describe Merb::Controller do  
   before(:all) do
     class OtherController < Merb::Controller
