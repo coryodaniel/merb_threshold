@@ -53,7 +53,7 @@ module Merb
       # A succinct wrapper to bulk register thresholds on actions and check access to those thresholds
       # in before filters.  This method will register the threshold and create the before filters.
       # 
-      # The threshold names will be "#{controlLer_name}/#{action_name}" when actions are given.
+      # The threshold names will be :"#{controller_name}/#{action_name}" when actions are given.
       #
       # If not actions are specified the threshold will be named for the controller.
       #
@@ -149,19 +149,19 @@ module Merb
           self.register_threshold(controller_name,threshold_opts)
 
           self.before(nil,filter_opts) do
-            if !permit_access?(controller_name) && halt_with
+            if !permit_access?(controller_name) && !halt_with.nil?
               throw(:halt, halt_with)
             end
           end
         else
           #register a threshold for each action given
           thresholds_to_register.each do |action_to_register|
-            tmp_threshold_name = "#{controller_name}/#{action_to_register}".to_sym
+            tmp_threshold_name = :"#{controller_name}/#{action_name}"
             
             self.register_threshold(tmp_threshold_name,threshold_opts)
 
             self.before(nil, filter_opts.merge({:only => [action_to_register]})) do 
-              if !permit_access?(tmp_threshold_name) && halt_with
+              if !permit_access?(tmp_threshold_name) && !halt_with.nil?
                 throw(:halt,halt_with)
               end
             end
@@ -186,7 +186,7 @@ module Merb
     #
     # @param [Boolean]
     def will_permit_another?(threshold_name=nil)
-      threshold_name ||= action_name
+      threshold_name ||= :"#{controller_name}/#{action_name}"
       opts = @@_threshold_map[threshold_name]
       curr_threshold_key = threshold_key(threshold_name)
 
@@ -221,7 +221,7 @@ module Merb
     #
     # @return [Boolean]
     def is_currently_exceeded?(threshold_name=nil)
-      threshold_name ||= action_name
+      threshold_name ||= :"#{controller_name}/#{action_name}"
       curr_threshold_key = threshold_key(threshold_name)
       exceeded_thresholds.member? curr_threshold_key
     end
@@ -279,7 +279,7 @@ module Merb
     # @returns [Boolean] was the access permitted?
     #
     def permit_access?(threshold_name=nil)
-      threshold_name ||= "#{controller_name}/#{action_name}".to_sym
+      threshold_name ||= :"#{controller_name}/#{action_name}"
       
       curr_threshold_key = threshold_key(threshold_name)
       opts = @@_threshold_map[threshold_name]

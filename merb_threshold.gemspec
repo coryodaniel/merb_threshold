@@ -6,7 +6,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Cory O'Daniel"]
-  s.date = %q{2009-02-24}
+  s.date = %q{2009-02-25}
   s.description = %q{Merb plugin that provides resource access rate limits and captcha'ing}
   s.email = %q{contact@coryodaniel.com}
   s.extra_rdoc_files = ["README", "LICENSE", "TODO"]
@@ -23,11 +23,11 @@ Gem::Specification.new do |s|
     s.specification_version = 2
 
     if Gem::Version.new(Gem::RubyGemsVersion) >= Gem::Version.new('1.2.0') then
-      s.add_runtime_dependency(%q<merb>, [">= 1.0.7.1"])
+      s.add_runtime_dependency(%q<merb-core>, [">= 1.0.7.1"])
     else
-      s.add_dependency(%q<merb>, [">= 1.0.7.1"])
+      s.add_dependency(%q<merb-core>, [">= 1.0.7.1"])
     end
   else
-    s.add_dependency(%q<merb>, [">= 1.0.7.1"])
+    s.add_dependency(%q<merb-core>, [">= 1.0.7.1"])
   end
 end

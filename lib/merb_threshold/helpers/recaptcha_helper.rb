@@ -19,7 +19,7 @@ module Merb
       def captcha(threshold_name = nil, opts={})
         if threshold_name.is_a?(Hash)
           opts = threshold_name
-          threshold_name = action_name
+          threshold_name = :"#{controller_name}/#{action_name}"
         end
 
         curr_threshold_key = threshold_key(threshold_name)

@@ -2,3 +2,9 @@ TODO:
 	* Consider adding ability to have various stores for threshold data
 	* Consider HTTP method option to threshold
 	* Support for MerbParts
+	
+	* Continual abuse should always force wait/captcha
+		=> option to specify what 'continual abuse' is
+		=> Need an array of historical exceeds
+	* require 'wait' like require 'captcha'
+	* if captcha was invalid, dont pass on wait if the threshold expired
